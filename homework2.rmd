@@ -1,0 +1,198 @@
+---
+title: "homework 2"
+author: "Sze Pui Tsang"
+date: "9/10/2021"
+output: github_document
+---
+load the library first
+```{r library}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+```
+
+# Problem 1
+
+```{r define path}
+path_of_data = "C:/Users/Yang/Desktop/st3340_p8105_classex/data_hw2/Trash-Wheel-Collection-Totals-7-2020-2.xlsx"
+```
+
+```{r import the dataframe}
+mr_trash_df = 
+  read_excel( 
+    path = path_of_data,
+    sheet = "Mr. Trash Wheel"
+    )
+```
+We have to clean the table by cleaning up the variable names,
+omitting the missing value abd rounding the number of sport balls to 
+the nearest integer
+
+```{r clean the data frame}
+clean_mr_trash_df = mr_trash_df %>%
+  janitor::clean_names() %>%
+  drop_na(dumpster) %>%
+  mutate ( 
+    sports_balls = round(sports_balls, digits = 0)
+  )
+  
+``` 
+
+Read and clean precipitation data for 2018. 
+```{r Read data for 2018}
+precipitation_18_df= read_excel( 
+    path = path_of_data,
+    sheet = "2018 Precipitation",
+    range = "A2:B14")
+```
+
+```{r clean data for 2018}
+precipitation_18_df = precipitation_18_df %>%
+  janitor :: clean_names() %>%
+  drop_na(month) %>%
+  mutate(year =2018) %>%
+  relocate(year, .before = "month")%>%
+  mutate(
+    total = round(total, digit = 1)
+  )
+```
+
+Read and clean precipitation data for 2019.
+```{r clean data for 2019}
+precipitation_19_df= read_excel( 
+    path = path_of_data,
+    sheet = "2019 Precipitation",
+    range = "A2:B14")%>%
+  janitor :: clean_names() %>%
+  drop_na(month)%>%
+  mutate(year =2019)%>%
+  relocate(year, .before = "month")%>%
+  mutate(
+    total = round(total, digit = 1)
+  )
+```
+
+Combind precipitation dataset and convert month into a character variable
+```{r combind the two dataset}
+month_df =
+  tibble(
+    month = 1:12,
+    month_name = month.name)
+precipitation_18and19_df = bind_rows(precipitation_18_df,precipitation_19_df)
+precipitation_18and19_df = left_join(precipitation_18and19_df, month_df, by="month")
+```
+
+view the dataset
+```{r}
+median(precipitation_19_df$total)
+sum(precipitation_18_df$total)
+```
+
+The median number of sports balls in a dumpster in 2019 was 3.35
+The total precipitation in 2018 was 70.3 inches
+
+
+# Problem 2
+```{r import the dataframe}
+pols_month_df = read.csv("pols-month.csv", header = TRUE, sep= ",")
+snp_df =read.csv("snp.csv", header = TRUE, sep= ",")
+wide_umemployment_df = read.csv("unemployment.csv", header = TRUE, sep= ",")
+```
+
+Firstly, clean the data in pols- months
+learning note: R ifelse function 
+ifelse(testexpression, x, y)
+The returned vector has element from x if the corresponding value of test_expression 
+is TRUE and return y if it is FALSE 
+
+```{r clean dataframe for pol_month}
+clean_pols_month_df = pols_month_df %>%
+  separate(mon, c("year", "month", "day"), sep = "-") %>%
+  mutate (month = month.name[as.integer(month)])%>%
+  mutate(year = as.integer(year))%>%
+  mutate (president = ifelse(prez_dem == 1, "dem", "gop"))%>%
+  select(-prez_dem, -prez_gop, - day)%>%
+  arrange(year,month)
+```
+
+Clean the np dataset
+It is noticed that the column year has ony two digits, 
+ifelse function is applied in order to turn them into four digits, 
+which is more readable 
+
+```{r clean dataframe for snp}
+clean_snp_df = snp_df %>%
+  separate(date, c("day", "month", "year"), sep = "/") %>%
+   mutate (month = month.name[as.integer(month)])%>%
+  mutate(year = as.integer(year))%>%
+  relocate(year, month)%>%
+  arrange(year,month)%>%
+  mutate(year = ifelse( year<15, year+2000, year+1900))%>%
+  select(-day)
+```
+
+Joining the two dataset snp and pols together 
+
+```{r}
+snp_pols_df = left_join(clean_snp_df, clean_pols_month_df, by=c("year","month"))
+```
+
+Turning unemplyment from long to wide 
+```{r}
+long_umemployment_df = wide_umemployment_df%>%
+  janitor::clean_names()%>%
+  pivot_longer(
+    cols=!year,
+    names_to="month", 
+    values_to = "unemployment rate")%>%
+    mutate(year = as.integer(year))
+```
+
+Merge the three tables together
+```{r}
+
+umeployment_snp_pols = bind_rows(snp_pols_df,long_umemployment_df) 
+```
+#Problem 3
+```{r import the dataframe}
+baby_name_df = read_csv("Popular_Baby_Names.csv", show_col_types = FALSE)
+view(baby_name_df)
+```
+
+```{r clean the data}
+baby_name_df = baby_name_df%>%
+  janitor :: clean_names()%>%
+  distinct()%>%
+  mutate(across(where(is.character), toupper))%>%
+  mutate(ethnicity = replace(ethnicity,ethnicity =="BLACK NON HISP", "BLACK NON HISPANIC"),
+         ethnicity = replace(ethnicity,ethnicity =="WHITE NON HISP", "WHITE NON HISPANIC"),
+         ethnicity = replace(ethnicity,ethnicity =="ASIAN AND PACI", "ASIAN AND PACIFIC ISLANDER"))
+
+```
+
+
+
+```{r a dataframe ranking the popularity of female's baby name "Olivia}
+
+Olivia_rank_df = baby_name_df%>%
+  filter(childs_first_name == "OLIVIA")%>%
+  select(-gender,-childs_first_name, -count)%>%
+  pivot_wider(names_from ="year_of_birth", values_from = "rank")
+```
+
+
+```{r a dataframe ranking the most popular male chidren over time}
+popular_male_name = baby_name_df %>%
+  filter(gender == "MALE", rank == 1)%>%
+  select(-gender, -count, -rank)%>%
+  pivot_wider(names_from ="year_of_birth", values_from = "childs_first_name")
+```
+
+```{r scatter plot}
+scatter_plot = baby_name_df %>%
+  filter(gender == "MALE", ethnicity == "WHITE NON HISPANIC", year_of_birth == 2016) 
+
+scatter_plot_2 = ggplot(scatter_plot, aes(x = rank, y = count)) + geom_point()
+print(scatter_plot_2)
+```
